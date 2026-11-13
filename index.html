@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dis-Chem — SAP LeanIX Implementation Readiness Assessment</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --sap-blue: #0070f2;
+    --sap-dark: #1d2d3e;
+    --dischem-green: #2db34a;
+    --sap-light: #f5f6f7;
+    --green: #107e3e;
+    --orange: #e9730c;
+    --red: #bb0000;
+    --yellow: #f0ab00;
+    --border: #d9d9d9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "72","Helvetica Neue",Arial,sans-serif; background: #f0f2f5; color: #32363a; font-size: 14px; }
+  header { background: #2db34a; color: #fff; padding: 14px 32px; display: flex; align-items: center; gap: 16px; }
+  header img { height: 28px; }
+  header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.3px; }
+  header span { font-size: 13px; color: #c0c8d0; }
+  /* ── Sidebar layout ── */
+  .app-body { display: flex; min-height: calc(100vh - 74px); }
+  .sidebar {
+    width: 210px; min-width: 210px; background: #f0f2f5;
+    border-right: 1px solid var(--border);
+    padding: 20px 12px; position: sticky; top: 0;
+    height: calc(100vh - 74px); overflow-y: auto;
+    box-shadow: 2px 0 6px rgba(0,0,0,.06);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .sidebar-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .8px;
+    color: #999; padding: 0 4px 8px; font-weight: 700;
+  }
+  .sidebar-section {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+    color: #fff; padding: 9px 12px; font-weight: 700; margin-top: 6px;
+    background: linear-gradient(135deg, #1d2d3e 0%, #2a4a6b 100%);
+    border-radius: 8px; cursor: pointer; user-select: none;
+    border: 1px solid #1a2635; border-bottom: 3px solid #0f1a26;
+    box-shadow: 0 3px 6px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.1);
+    transition: all .15s ease;
+  }
+  .sidebar-section:hover {
+    background: linear-gradient(135deg, #264060 0%, #3a6090 100%);
+    box-shadow: 0 4px 10px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.15);
+    transform: translateY(-1px);
+  }
+  .sidebar-section .chevron {
+    font-size: 10px; transition: transform .25s ease; display: inline-block;
+  }
+  .sidebar-section.collapsed .chevron { transform: rotate(-90deg); }
+  .sidebar-group { overflow: hidden; transition: max-height .3s ease, opacity .25s ease; max-height: 500px; opacity: 1; padding-left: 8px; }
+  .sidebar-group.collapsed { max-height: 0; opacity: 0; pointer-events: none; }
+  .sidebar-spacer { flex: 1; }
+  .sidebar-bottom { border-top: 1px solid #d9d9d9; padding-top: 8px; margin-top: 4px; }
+  /* 3-D nav button */
+  .tab {
+    display: block; width: 100%;
+    padding: 11px 16px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: #444;
+    text-align: left; white-space: normal; line-height: 1.35;
+    background: linear-gradient(180deg, #ffffff 0%, #e8eaed 100%);
+    border: 1px solid #c0c4cc;
+    border-bottom: 3px solid #a8acb5;
+    border-radius: 8px;
+    box-shadow: 0 3px 6px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.9);
+    transition: all .12s ease;
+    user-select: none;
+  }
+  .tab:hover {
+    background: linear-gradient(180deg, #f6fff8 0%, #d8f4df 100%);
+    border-color: #2db34a; border-bottom-color: #1e8a38;
+    color: #1a7a30;
+    box-shadow: 0 4px 8px rgba(45,179,74,.2), inset 0 1px 0 rgba(255,255,255,.9);
+    transform: translateY(-1px);
+  }
+  .tab.active {
+    background: linear-gradient(180deg, #2db34a 0%, #1e8a38 100%);
+    border-color: #166e2c; border-bottom-color: #0f4d1e;
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.25);
+    transform: translateY(1px);
+  }
+  .main-content { flex: 1; overflow-y: auto; background: #f0f2f5; }
+  .content { display: none; padding: 24px 32px; max-width: 1300px; }
+  .content.active { display: block; }
+  /* Cards */
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 20px 24px; margin-bottom: 20px; }
+  .card h2 { font-size: 16px; font-weight: 600; color: var(--sap-dark); margin-bottom: 12px; }
+  .card h3 { font-size: 14px; font-weight: 600; color: var(--sap-dark); margin-bottom: 8px; }
+  /* KPI Row */
+  .kpi-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .kpi { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px 20px; flex: 1; min-width: 160px; }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #777; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; }
+  .kpi-sub { font-size: 12px; color: #888; margin-top: 4px; }
+  /* Score badges */
+  .score-badge { display: inline-block; width: 44px; height: 44px; border-radius: 50%; text-align: center; line-height: 44px; font-weight: 700; font-size: 17px; color: #fff; cursor: pointer; transition: transform .15s, box-shadow .15s; user-select: none; }
+  .score-badge:hover { transform: scale(1.12); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .score-0 { background: #c0c4cc; color: #666; }
+  .score-1 { background: var(--red); }
+  .score-2 { background: var(--red); }
+  .score-3 { background: var(--orange); }
+  .score-4 { background: #1d8c4c; }
+  .score-5 { background: var(--green); }
+  /* Rating pills */
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .pill-critical { background: #ffeaea; color: var(--red); }
+  .pill-low { background: #fff4e0; color: #b44e00; }
+  .pill-moderate { background: #fff8c0; color: #7a5900; }
+  .pill-strong { background: #e6f5ec; color: var(--green); }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f5f6f7; padding: 9px 12px; text-align: left; font-weight: 600; color: var(--sap-dark); border-bottom: 2px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
+  td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  tr:hover td { background: #fafbfc; }
+  tr.section-header td { background: var(--sap-dark); color: #fff; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; padding: 7px 12px; }
+  /* Select dropdown */
+  select { border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 13px; background: #fff; cursor: pointer; }
+  select:focus { outline: none; border-color: #2db34a; }
+  /* Progress bar */
+  .progress-bar { background: #e8e8e8; border-radius: 4px; height: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+  /* Status badges */
+  .status-done { background: #e6f5ec; color: var(--green); }
+  .status-inprogress { background: #e8f4ff; color: var(--sap-blue); }
+  .status-notstarted { background: #f5f5f5; color: #777; }
+  .status-blocked { background: #ffeaea; color: var(--red); }
+  /* About page */
+  .about-p { line-height: 1.7; color: #444; margin-bottom: 10px; }
+  .about-table td { padding: 10px 14px; }
+  .about-table tr:nth-child(even) td { background: #fafbfc; }
+  /* Dimension header row */
+  .dim-header td { background: #e8f0fc; font-weight: 700; color: #1a3a6b; font-size: 13px; }
+  /* Chart container */
+  .chart-wrap { position: relative; height: 400px; width: 100%; max-width: 500px; margin: 0 auto; }
+  /* Grid layout for dashboard */
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width:900px){ .dash-grid { grid-template-columns: 1fr; } }
+  .textarea-answer { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 60px; }
+  .textarea-answer:focus { outline: none; border-color: var(--sap-blue); }
+  input[type=text] { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 13px; font-family: inherit; }
+  input[type=text]:focus { outline: none; border-color: #2db34a; }
+  .tooltip-cell { max-width: 220px; }
+  .level-cell { font-size: 11.5px; color: #555; line-height: 1.4; }
+  .comment-input { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; font-size: 12px; min-height: 36px; resize: vertical; }
+  /* Score cell hover tooltip */
+  #score-tip {
+    position: fixed; display: none; z-index: 9999; pointer-events: none;
+    background: #1d2d3e; color: #fff; border-radius: 10px;
+    padding: 14px 16px; max-width: 340px; width: 340px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4); line-height: 1.55; font-size: 12.5px;
+  }
+  #score-tip .st-title { font-weight: 700; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .6px; padding-bottom: 8px; margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,.15); color: #a8c4e0; }
+  #score-tip .st-row { margin-bottom: 9px; }
+  #score-tip .st-row:last-child { margin-bottom: 0; }
+  #score-tip .st-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; margin-bottom: 3px; }
+  .score-cell { cursor: help; vertical-align: middle; padding: 10px 8px; }
+  .score-cell select { display: block; margin: 0 auto; width: 72px; font-weight: 700; font-size: 14px; text-align: center; border: none; border-radius: 6px; padding: 5px 4px; cursor: pointer; color: #fff; }
+  .score-cell select option { color: #333; background: #fff; }
+  /* Owner dropdown colour states — applied to <select> like status-done etc. */
+  .owner-none     { background:#f5f5f5;color:#999;border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:13px;width:100%;cursor:pointer; }
+  .owner-sap      { background:#dbeeff;color:#0054b0;font-weight:700;border:1px solid #90c4f9;border-radius:6px;padding:5px 8px;font-size:13px;width:100%;cursor:pointer; }
+  .owner-customer { background:#e6f5ec;color:#107e3e;font-weight:700;border:1px solid #8ecfaa;border-radius:6px;padding:5px 8px;font-size:13px;width:100%;cursor:pointer; }
+  .owner-both     { background:#fff3e0;color:#b44e00;font-weight:700;border:1px solid #f5c07a;border-radius:6px;padding:5px 8px;font-size:13px;width:100%;cursor:pointer; }
+  .owner-none:focus,.owner-sap:focus,.owner-customer:focus,.owner-both:focus { outline:none; }
+  .summary-counts { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .count-pill { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+
+  /* ── Login overlay ── */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1d2d3e 0%, #0a1628 100%);
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    background: #fff; border-radius: 16px; padding: 40px 36px 32px;
+    width: 380px; max-width: 92vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.06);
+    text-align: center;
+  }
+  .login-card .logo-bar {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-bottom: 24px;
+  }
+  .login-card .logo-bar img { height: 36px; }
+  .login-card .logo-bar .divider {
+    width: 1px; height: 28px; background: #d9d9d9;
+  }
+  .login-card h2 {
+    font-size: 18px; font-weight: 700; color: #1d2d3e; margin-bottom: 6px;
+  }
+  .login-card .subtitle {
+    font-size: 12px; color: #888; margin-bottom: 24px;
+  }
+  .login-card label {
+    display: block; text-align: left; font-size: 12px; font-weight: 600;
+    color: #555; margin-bottom: 4px; margin-top: 14px;
+  }
+  .login-card input[type="text"],
+  .login-card input[type="password"] {
+    width: 100%; padding: 10px 12px; font-size: 14px;
+    border: 1px solid #c0c4cc; border-radius: 8px;
+    outline: none; transition: border-color .15s;
+    font-family: inherit;
+  }
+  .login-card input:focus {
+    border-color: #0070f2;
+    box-shadow: 0 0 0 3px rgba(0,112,242,.12);
+  }
+  .login-card .login-btn {
+    width: 100%; margin-top: 22px; padding: 12px;
+    font-size: 14px; font-weight: 700; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, #2db34a 0%, #1e8a38 100%);
+    border: none; border-radius: 8px;
+    border-bottom: 3px solid #166e2c;
+    box-shadow: 0 4px 12px rgba(45,179,74,.3);
+    transition: all .15s;
+  }
+  .login-card .login-btn:hover {
+    background: linear-gradient(135deg, #34c653 0%, #24a043 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(45,179,74,.4);
+  }
+  .login-card .login-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(45,179,74,.2);
+  }
+  .login-card .error-msg {
+    color: #bb0000; font-size: 12px; margin-top: 12px;
+    min-height: 18px; font-weight: 600;
+  }
+  .app-wrapper { display: none; }
+  .app-wrapper.visible { display: block; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="logo-bar">
+      <svg width="130" height="36" viewBox="0 0 130 36"><text x="0" y="28" font-family="'72','Helvetica Neue',Arial,sans-serif" font-size="24" font-weight="800" fill="#2db34a">Dis-Chem</text></svg>
+      <div class="divider"></div>
+      <svg width="90" height="36" viewBox="0 0 90 36"><text x="0" y="26" font-family="'72','Helvetica Neue',Arial,sans-serif" font-size="14" font-weight="700" fill="#0070f2">SAP LeanIX</text></svg>
+    </div>
+    <h2>Implementation Readiness</h2>
+    <p class="subtitle">Sign in to access the assessment</p>
+    <form id="loginForm" onsubmit="return handleLogin(event)">
+      <label for="loginUser">Username</label>
+      <input type="text" id="loginUser" autocomplete="username" placeholder="Enter your username" required>
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password" placeholder="Enter your password" required>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+    <div class="error-msg" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP WRAPPER (hidden until login) -->
+<div class="app-wrapper" id="appWrapper">
+<header>
+  <div style="flex:1;">
+    <h1>SAP LeanIX Implementation Readiness Assessment</h1>
+    <span>Dis-Chem Pharmacies &nbsp;|&nbsp; Powered by SAP LeanIX</span>
+  </div>
+  <button onclick="handleLogout()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:7px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.3px;transition:all .15s ease;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">Sign Out</button>
+  <div style="display:flex;align-items:center;background:#fff;border-radius:8px;padding:6px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAzkAAAH+CAYAAAC/YMA8AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAgAElEQVR4nOzd6Zck13km9ufeiMg9K2uvrqreN6zEQoIkJIrUDKWRZsYji+f4nDn2Fx//af7qL7bHY/vI9kiWtYsUSZGCIAIgGgAbDfTetVduca8/3DWyshpd1ZWFrOjnJzVRlZUZGeuN+753CYH/8d9rEBERERERlYT8uleAiIiIiIjoJDHIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEiIiIiolJhkENERERERKXCIIeIiIiIiEqFQQ4REREREZUKgxwiIiIiIioVBjlERERERFQqDHKIiIiIiKhUGOQQEREREVGpMMghIiIiIqJSYZBDRERERESlwiCHiIiIiIhKhUEOERERERGVCoMcIiIiIiIqFQY5RERERERUKgxyiIiIiIioVBjkEBERERFRqTDIISIiIiKiUmGQQ0REREREpcIgh4iIiIiISoVBDhERERERlQqDHCIiIiIiKhUGOUREREREVCoMcoiIiIiIqFQY5BARERERUakwyCEi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" alt="Dis-Chem" style="height:44px;display:block;">
+  </div>
+</header>
+
+<!-- APP BODY: sidebar + main -->
+<div class="app-body">
+<nav class="sidebar">
+  <div class="sidebar-title">Navigation</div>
+  <div class="tab active" onclick="showTab(0)">About</div>
+
+  <div class="sidebar-section">Pre-Implementation</div>
+  <div class="sidebar-group" id="sec-pre">
+    <div class="tab" onclick="showTab(1)">Scored Assessment</div>
+    <div class="tab" onclick="showTab(2)">Maturity Dashboard</div>
+    <div class="tab" onclick="showTab(3)">General Questions</div>
+  </div>
+
+  <div class="sidebar-spacer"></div>
+
+  <div class="sidebar-bottom">
+    <div class="tab" onclick="showTab(4)">Scale Reference</div>
+  </div>
+</nav>
+<div class="main-content">
+
+<!-- ===== TAB 0: ABOUT ===== -->
+<div class="content active" id="tab0">
+  <div style="background:linear-gradient(135deg,#1d2d3e 0%,#0070f2 50%,#00b4d8 100%);border-radius:12px;padding:32px 36px;margin-bottom:24px;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.2);">
+    <h1 style="font-size:22px;font-weight:800;margin-bottom:12px;line-height:1.3;letter-spacing:-.3px;">SAP LeanIX supports you at every stage — from Pre-Implementation through Go-Live to Post-Implementation</h1>
+    <p style="font-size:14px;line-height:1.7;opacity:.92;max-width:900px;">Backed by our Professional Services consultants and dedicated Customer Success Managers, we partner with you to ensure a smooth implementation, accelerate time-to-value, and drive long-term adoption across your organisation.</p>
+    <div style="display:flex;gap:24px;margin-top:20px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;"><span style="background:rgba(255,255,255,.2);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;">1</span><span style="font-size:13px;font-weight:600;">Pre-Implementation</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><span style="background:rgba(255,255,255,.2);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;">2</span><span style="font-size:13px;font-weight:600;">Implementation</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><span style="background:rgba(255,255,255,.2);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;">3</span><span style="font-size:13px;font-weight:600;">Post-Implementation (CSM)</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>SAP LeanIX Implementation Readiness Assessment</h2>
+    <p style="color:#0070f2;font-weight:600;margin-bottom:12px;">Dis-Chem Pharmacies</p>
+    <h3 style="margin-bottom:8px;">Purpose of This Assessment</h3>
+    <p class="about-p">This assessment is designed to understand your current Enterprise Architecture maturity and readiness for a SAP LeanIX implementation. It is not a test or a gate — there are no pass or fail outcomes.</p>
+    <p class="about-p">SAP LeanIX and the Jumpstart methodology are built to support organisations at every maturity level, from those taking their first steps in EA to those with well-established practices. Whether your score is low or high, the Jumpstart is designed to meet you where you are and help you move forward.</p>
+    <h3 style="margin:16px 0 8px;">The goal of this assessment is to:</h3>
+    <ul style="padding-left:20px;color:#444;line-height:1.8;">
+      <li>Understand your current state so the implementation team can tailor the Jumpstart to your needs</li>
+      <li>Identify areas where preparation before kickoff will accelerate value delivery</li>
+      <li>Establish a maturity baseline that you can measure progress against over time</li>
+      <li>Ensure the right people, data, and systems are available for a smooth implementation</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Every Maturity Level Is a Valid Starting Point</h2>
+    <p class="about-p">A low score does not mean you are not ready for LeanIX — it means the Jumpstart will be adapted to build the foundations with you. A high score means we can move faster and go deeper into advanced use cases from the start.</p>
+    <h3 style="margin:14px 0 8px;">The Jumpstart is specifically designed to:</h3>
+    <ul style="padding-left:20px;color:#444;line-height:1.8;">
+      <li><strong>Low maturity:</strong> Establish your first EA practice, data baseline, and governance processes using LeanIX as the enabling platform</li>
+      <li><strong>Moderate maturity:</strong> Operationalise use cases, close data gaps, and integrate LeanIX into existing IT processes</li>
+      <li><strong>High maturity:</strong> Accelerate advanced use cases, automation, and strategic decision-making capabilities</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>How Scores Translate to Implementation Approach</h2>
+    <table class="about-table">
+      <thead><tr><th>Score Range</th><th>Maturity Level</th><th>What It Means for Your Jumpstart</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1.0 – 2.0</strong></td><td><span class="pill pill-critical">Starting Out</span></td><td>The Jumpstart will focus on establishing foundations: building your first application inventory, defining data ownership, and setting up governance. More time is allocated to data collection and stakeholder onboarding.</td></tr>
+        <tr><td><strong>2.1 – 3.0</strong></td><td><span class="pill pill-low">Building</span></td><td>Core EA building blocks are emerging. The Jumpstart will focus on formalising what exists, closing key gaps, and delivering your first actionable reports and dashboards.</td></tr>
+        <tr><td><strong>3.1 – 4.0</strong></td><td><span class="pill pill-moderate">Established</span></td><td>Strong foundations in place. The Jumpstart can move quickly through setup and focus more time on advanced use cases, integrations, and stakeholder enablement.</td></tr>
+        <tr><td><strong>4.1 – 5.0</strong></td><td><span class="pill pill-strong">Advanced</span></td><td>Mature EA practice. The Jumpstart focuses on maximising LeanIX capabilities, automation, advanced reporting, and embedding EA deeply into IT and business decision-making processes.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>How to Complete This Assessment</h2>
+    <ol style="padding-left:20px;color:#444;line-height:2;">
+      <li>Go to the <strong>Scored Assessment</strong> tab and answer each question by selecting a score from 1 to 5 using the dropdown</li>
+      <li>Use the Level 1, Level 3, and Level 5 descriptions as guidance for where you fall</li>
+      <li>Add any context or comments in the Comments column — this helps the implementation team understand your situation</li>
+      <li>View the <strong>Maturity Dashboard</strong> tab for a live summary of your scores and radar chart</li>
+      <li>The <strong>Jumpstart Readiness</strong> section in the Scored Assessment includes all prerequisite items — score each one to track readiness</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ===== TAB 1: SCORED ASSESSMENT ===== -->
+<div class="content" id="tab1">
+  <div class="card" style="margin-bottom:12px;">
+    <p style="color:#555;font-size:13px;">Score each question 1–5 using the dropdown. The <strong>Maturity Dashboard</strong> updates automatically. Use the Comments field to provide context.</p>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table id="scored-table">
+      <thead>
+        <tr>
+          <th style="width:36px;">#</th>
+          <th style="width:160px;">Dimension</th>
+          <th>Question</th>
+          <th style="width:120px;text-align:center;">Score</th>
+          <th style="width:300px;">Comments</th>
+        </tr>
+      </thead>
+      <tbody id="scored-body">
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== TAB 2: MATURITY DASHBOARD ===== -->
+<div class="content" id="tab2">
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Global Maturity Score</div>
+      <div class="kpi-value" id="global-score">–</div>
+      <div class="kpi-sub">out of 5.0</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Global Maturity %</div>
+      <div class="kpi-value" id="global-pct">–</div>
+      <div class="kpi-sub">overall readiness</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Overall Rating</div>
+      <div class="kpi-value" style="font-size:18px;" id="global-rating">–</div>
+      <div class="kpi-sub" id="global-rating-desc">–</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Questions Scored</div>
+      <div class="kpi-value" id="scored-count">–</div>
+      <div class="kpi-sub">of 87 total questions</div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="card">
+      <h2>Dimension Scores</h2>
+      <table>
+        <thead><tr><th>Dimension</th><th>Avg Score</th><th>Maturity %</th><th>Rating</th></tr></thead>
+        <tbody id="dim-table-body"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Maturity Radar</h2>
+      <div class="chart-wrap">
+        <canvas id="radarChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Score Interpretation Guide</h2>
+    <table class="about-table">
+      <thead><tr><th>Score Range</th><th>Level</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>1.0 – 2.0</td><td><span class="pill pill-critical">Critical</span></td><td>Significant gaps identified. Jumpstart is achievable with scope adjustments, extended timelines, and targeted pre-work before kickoff.</td></tr>
+        <tr><td>2.1 – 3.0</td><td><span class="pill pill-low">Low</span></td><td>Foundational gaps exist. Plan extra workshops or extended timeline.</td></tr>
+        <tr><td>3.1 – 3.9</td><td><span class="pill pill-moderate">Moderate</span></td><td>Solid foundation. Standard Jumpstart scope with manageable adjustments.</td></tr>
+        <tr><td>4.0 – 5.0</td><td><span class="pill pill-strong">Strong</span></td><td>High readiness. Accelerated rollout possible; focus on advanced use cases.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+
+
+
+
+<!-- Prerequisites Checklist merged into Jumpstart Readiness scored assessment -->
+
+<!-- ===== TAB 4: GENERAL QUESTIONS ===== -->
+<div class="content" id="tab4">
+  <div class="card">
+    <p class="about-p">Provide answers to the following questions to help the implementation team tailor the Jumpstart to your specific context.</p>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table>
+      <thead><tr><th style="width:36px;">#</th><th>Question</th><th style="width:40%;">Answer</th></tr></thead>
+      <tbody id="gq-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== TAB 5: SCALE REFERENCE ===== -->
+<div class="content" id="tab5">
+  <div class="card">
+    <h2>Scoring Scale</h2>
+    <table>
+      <thead><tr><th style="width:80px;">Score</th><th>Description</th><th>Badge</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1</strong></td><td>No awareness or activity — The organization has not started in this area.</td><td><span class="score-badge score-1">1</span></td></tr>
+        <tr><td><strong>2</strong></td><td>Aware but not acting — The need is recognized but no structured approach exists.</td><td><span class="score-badge score-2">2</span></td></tr>
+        <tr><td><strong>3</strong></td><td>In progress / partial — Efforts are underway but inconsistent or ad hoc.</td><td><span class="score-badge score-3">3</span></td></tr>
+        <tr><td><strong>4</strong></td><td>Established — Processes are defined and mostly consistent but not yet optimized.</td><td><span class="score-badge score-4">4</span></td></tr>
+        <tr><td><strong>5</strong></td><td>Embedded &amp; improving — Fully operational, measured, and continuously improving.</td><td><span class="score-badge score-5">5</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Color Coding Guide</h2>
+    <table>
+      <thead><tr><th>Score Range</th><th>Level</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>1 – 2</td><td><span class="pill pill-critical">Critical</span></td><td>Significant risk to implementation success</td></tr>
+        <tr><td>3</td><td><span class="pill pill-low">Moderate</span></td><td>Gaps exist; plan mitigation during Jumpstart</td></tr>
+        <tr><td>4 – 5</td><td><span class="pill pill-strong">Strong</span></td><td>Ready for standard or accelerated rollout</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+</div>
+
+</div>
+<script>
+// ===================== DATA =====================
+const questions = [
+  // [id, dimension, question, defaultScore, level1, level3, level5, comment]
+  [1,'Organizational Maturity','Our EA practice has a clear vision focused on improving business outcomes.',0,'EA is used only to provide transparency about the IT portfolio with no business alignment.','EA has defined goals linked to business outcomes, but execution is inconsistent.','EA is strictly driven by use cases and their measurable contribution to business value.',null],
+  [2,'Organizational Maturity','Our EA practice plays a strategic role in all relevant IT processes.',0,'EA has no strategic relevance; it is disconnected from IT decision-making.','EA is consulted in some IT processes (e.g., project intake) but not systematically.','EA is naturally consumed as part of all IT-related processes (investment, procurement, change).',null],
+  [3,'Organizational Maturity','Our EA practice has buy-in from top management and has influence across the business.',0,'Top management is not aware of or engaging with EA at all.','CIO/IT leadership supports EA, but engagement beyond IT is limited.','C-level buy-in beyond IT is secured; EA is recognized as a business capability.',null],
+  [4,'Organizational Maturity','Our EA practice is included by relevant stakeholders for business and IT initiatives.',0,'EA has no crossing points with stakeholders in the organization.','EA is engaged on major programs but not embedded in day-to-day initiative planning.','Strong collaboration between EA and all relevant business & IT stakeholders.',null],
+  [5,'Organizational Maturity','We have a defined EA team structure with clear roles and responsibilities.',0,'No dedicated EA role exists; architecture is done ad hoc by whoever is available.','1-2 people carry EA responsibilities part-time alongside other duties.','Dedicated EA team with defined roles (EA lead, domain architects, data stewards).',null],
+  [6,'Organizational Maturity','Our EA team has domain expertise relevant to our industry (retail, pharmacy, SAP).',0,'No architecture expertise specific to our industry or technology stack.','Some team members have relevant domain knowledge but gaps exist.','Deep domain expertise in retail, pharmacy operations, and SAP landscape.',null],
+  [7,'Organizational Maturity','Architecture governance gates are embedded in our project delivery process.',0,'No governance gates; projects proceed without architecture review.','Architecture review exists for large projects but is optional or inconsistent.','Mandatory architecture review gates at key milestones for all projects above threshold.',null],
+  [8,'Use Case Maturity','For each use case, our EA practice has developed a clear business case that is regularly reviewed.',0,'No use cases defined for the EA practice.','Key use cases are identified but business cases are informal or not tracked.','Use cases in scope are operationalized with a defined future roadmap of additional use cases.',null],
+  [9,'Use Case Maturity','We have established quantitative and qualitative goals for our EA practice.',0,'No deliverables (quantitative or qualitative) defined for EA.','Some goals exist but they focus on activity (reports produced) not outcomes.','Qualitative and quantitative objectives defined with focus on business impact.',null],
+  [10,'Use Case Maturity','Our strategic business transformations are supported by the EA practice.',0,'Business transformation is not considered by EA.','EA supports some transformations reactively when asked.','All strategic transformation initiatives are proactively supported by EA.',null],
+  [11,'Use Case Maturity','Application Portfolio Management adds value beyond IT.',0,'Application Portfolio Management not yet tackled by EA.','Application Portfolio Management is used for IT cost visibility but not connected to business decisions.','Application Portfolio Management continuously adds value to business decision-making (rationalization, M&A, compliance).',null],
+  [12,'Use Case Maturity','We have a defined approach to application rationalization (consolidation, retirement, migration).',0,'No rationalization activity; all applications are treated as equally necessary.','Some rationalization efforts exist but are project-driven, not continuous.','Systematic rationalization process with lifecycle reviews and business-case-driven decisions.',null],
+  [13,'Use Case Maturity','We actively manage obsolescence risk across the technology portfolio.',0,'No visibility into end-of-life or end-of-support dates for technologies.','End-of-life data is tracked for some systems but not acted upon systematically.','Obsolescence risk is monitored continuously with remediation plans linked to roadmaps.',null],
+  [14,'Use Case Maturity','Our organization has defined or adopted a business capability model.',0,'No capability model exists; the organization thinks in terms of departments and systems.','A partial capability model exists or is under development.','A comprehensive, governed capability model is in use and mapped to applications.',null],
+  [15,'Use Case Maturity','We have a structured approach to SAP transformation planning (S/4HANA, SAP BTP).',0,'No SAP transformation planning has started or is not applicable.','SAP transformation is planned but architecture decisions are not formally documented.','Target architecture decisions are documented, governed, and traceable for S/4HANA and SAP BTP.',null],
+  [16,'Data Maturity','Data in our EA inventory is updated with little manual effort.',0,'Data needs repetitive manual updates; no automation in place.','Some data is auto-updated via integrations but most requires manual effort.','Data is updated in near real-time via integrations and automated discovery.',null],
+  [17,'Data Maturity','The data quality in our EA inventory is continuously assured across the portfolio.',0,'No data quality assurance; nobody checks or validates EA data.','Periodic data quality reviews happen but coverage is partial.','Data quality is assured across the whole IT portfolio with quality seals and KPIs.',null],
+  [18,'Data Maturity','We continuously collect new data based on new use cases.',0,'Collection of new data to extend the EA footprint is out of scope.','New data is collected when specific projects require it.','Streamlined collection of new data based on a joint understanding of evolving use cases.',null],
+  [19,'Data Maturity','Our management trusts EA data for decision-making.',0,"EA data is not used for decision-making; stakeholders don\'t trust it.",'Some stakeholders use EA data but cross-reference with other sources.','EA data is a key trusted source for IT and business decision-making.',null],
+  [20,'Data Maturity','We have a structured application inventory with key attributes populated.',0,"No centralized inventory exists; data is scattered across spreadsheets and people\'s heads.",'An inventory exists but is incomplete (missing owners, lifecycle, criticality for many apps).','Comprehensive inventory with >80% of applications having owner, criticality, lifecycle, and tech stack.',null],
+  [21,'Data Maturity','Application and data ownership is clearly assigned and accepted by owners.',0,'No ownership model; nobody is accountable for application data accuracy.','Ownership is assigned for critical applications but not enforced.','All applications have named owners who actively participate in data maintenance (surveys, reviews).',null],
+  [22,'Data Maturity','We have import-ready data sources (CMDB, spreadsheets, exports) for initial data load.',0,'No structured data sources available; everything would need to be built from scratch.','Some data exists in usable format but requires significant cleanup and mapping.','Clean, structured data available from CMDB/exports ready for bulk import with minimal mapping.',null],
+  [23,'Technology Maturity','We use our EA tool as a platform to support business transformation, not solely as a repository.',0,'EA tool is a standalone solution (or no EA tool exists).','EA tool is used for documentation and reporting but not embedded in transformation workflows.','EA tool is the IT transformation platform used for planning, decision-making, and governance.',null],
+  [24,'Technology Maturity','Our EA tool is well integrated into our IT ecosystem (ITSM, CMDB, PPM, financials).',0,'No integrations in place or planned.','1-2 integrations exist (e.g., CMDB sync) but most data flows are manual.','Integrated EA platform across IT domains with automated data synchronization.',null],
+  [25,'Technology Maturity','Our EA tool collaborates seamlessly with third-party solutions for automated data discovery.',0,'Third-party discovery solutions not in scope or not considered.','Some discovery tools exist but are not connected to the EA platform.','Third-party discovery solutions (SaaS discovery, cloud scanners) are fully integrated.',null],
+  [26,'Technology Maturity','We leverage automated data maintenance and automated action items for users.',0,'No use of automation or discovery features; everything is manual.','Some automation exists (e.g., scheduled reports) but no triggered workflows.','Extensive use of automations: surveys, quality triggers, lifecycle alerts, data refresh.',null],
+  [27,'Technology Maturity','We currently have an EA tool or platform in place.',0,'No EA tool; architecture artifacts are in PowerPoint, Visio, and spreadsheets.','A basic tool exists (SharePoint wiki, Confluence, or legacy EA tool) with limited capability.','A modern EA management platform is in use with active users and governed content.',null],
+  [28,'Technology Maturity','Our organization has SSO (Azure AD, Okta, etc.) ready for SaaS onboarding.',0,'No SSO infrastructure; SaaS tools use local credentials.','SSO exists but onboarding new SaaS tools requires a lengthy security review (>4 weeks).','SSO is standard; new SaaS tools can be onboarded within 1-2 weeks via established process.',null],
+  [29,'SAP & Clean Core Readiness','Our current SAP landscape (modules, customizations, interfaces) is documented.',0,'No documentation exists; SAP landscape knowledge is tribal.','Partial documentation exists (e.g., module list) but custom code and interfaces are undocumented.','Complete landscape documentation: modules, custom developments, interfaces, and dependencies.',null],
+  [30,'SAP & Clean Core Readiness','We have a defined S/4HANA target architecture and migration strategy.',0,'No S/4HANA planning has started or SAP is not in scope.','High-level migration strategy exists but target architecture decisions are not formalized.','Target architecture is documented with decisions on brownfield/greenfield, SAP BTP strategy, and timeline.',null],
+  [31,'SAP & Clean Core Readiness','Custom SAP ABAP developments are inventoried and classified (keep, retire, move to SAP BTP).',0,'No visibility into custom code volume or disposition.','Custom code analysis has been run but classification decisions are not made.','Full custom code inventory with each item classified (embedded ABAP, SAP BTP, retire) and linked to business rationale.',null],
+  [32,'SAP & Clean Core Readiness','Integration dependencies between SAP and non-SAP systems are mapped.',0,'No integration mapping exists; dependencies are discovered reactively during incidents.','Key integrations are known but a complete interface catalogue does not exist.','Complete interface catalogue with source, target, protocol, frequency, and business owner documented.',null],
+  [33,'SAP & Clean Core Readiness','We have access to SAP Cloud ALM or equivalent for landscape discovery.',0,'No SAP Cloud ALM or equivalent tool in use.','SAP Cloud ALM is available but not configured for architecture discovery.','SAP Cloud ALM is operational with integration monitoring and application library data available for LeanIX sync.',null],
+  [34,'SAP & Clean Core Readiness','Clean Core principles are understood and governance is being established.',0,'Clean Core concept is not known or not relevant to our SAP strategy.','Clean Core is understood conceptually but no governance framework is in place.','Clean Core governance is active: extension patterns are classified, decisions are documented and enforced.',null],
+  [35,'Integration Readiness','We have a CMDB or configuration management system with application and infrastructure data.',0,'No CMDB exists; asset data is in spreadsheets or unknown.','CMDB exists (ServiceNow, etc.) but data quality is inconsistent and coverage is partial.','CMDB is well-maintained with reliable application, server, and relationship data; API access is available.',null],
+  [36,'Integration Readiness','We have a project/portfolio management (PPM) tool with active project and initiative data.',0,'No PPM tool; projects are tracked in spreadsheets or email.','PPM tool exists (Jira, Clarity, etc.) but not all projects are captured.','PPM tool is the system of record for all IT projects with budget, timeline, and application linkage.',null],
+  [37,'Integration Readiness','We can provide API access to key source systems for LeanIX integrations.',0,'No API access available; all systems are locked down or lack APIs.','API access is possible but requires security review and approval per system (weeks of lead time).','API credentials and access are available or can be provisioned within days for key systems.',null],
+  [38,'Integration Readiness','We have an integration platform or middleware for system-to-system communication (e.g. SAP Integration Suite).',0,'No integration platform; integrations are point-to-point or manual.','Integration platform exists (MuleSoft, SAP Integration Suite, etc.) but not all integrations run through it.','Centralized integration platform with an integration catalogue, monitoring, and API management.',null],
+  [39,'Integration Readiness','We use SaaS discovery or CASB tools that can feed application inventory data.',0,'No SaaS discovery or CASB tools in use.','CASB or SaaS management tool exists but is not used for EA inventory purposes.','SaaS discovery (via SSO logs, CASB, or endpoint agents) is operational and can export to LeanIX.',null],
+  [40,'Integration Readiness','Source system data owners and technical contacts are identified for planned integrations.',0,'No contacts identified; we would need to figure out who owns what.','Key contacts are known for some systems but not all planned integrations.','Named technical contact and data owner identified for every source system in integration scope.',null],
+  [41,'Integration Readiness','We have sample data exports from key source systems available for mapping workshops.',0,'No data exports available; extraction would need to be requested from scratch.','Some exports exist (e.g., CMDB dump) but not for all planned source systems.','Sample exports from all key source systems (CMDB, PPM, AD, SAP) are available and reviewed.',null],
+  [42,'Retail & Omnichannel','Our omnichannel landscape (POS, e-commerce, mobile, loyalty, fulfilment) is documented.',0,'No landscape documentation; each channel team manages independently.','Partial documentation exists for key channels but cross-channel dependencies are not mapped.','Full omnichannel architecture map with all channels, integrations, and dependencies documented.',null],
+  [43,'Retail & Omnichannel','Store technology (POS, mPOS, peripherals, connectivity, edge infrastructure) is inventoried.',0,'No store technology inventory; knowledge is held by store operations team informally.','High-level inventory exists (e.g., POS vendor is known) but store-level detail is missing.','Detailed store technology inventory with lifecycle, vendor, version, and dependency data.',null],
+  [44,'Retail & Omnichannel','Pharmacy and dispensary system landscape is documented (e-script, chronic mgmt, claims).',0,'Pharmacy systems are managed separately; no architecture documentation exists.','Key pharmacy systems are known but integrations and data flows are undocumented.','Full pharmacy technology map with dispensary, e-script, claims, and regulatory system integrations documented.',null],
+  [45,'Retail & Omnichannel','Customer journey touchpoints are mapped to supporting applications and capabilities.',0,'Customer journeys are not mapped from a technology perspective.','Key customer journeys are understood but not formally linked to application/capability inventory.','Customer journeys are mapped to capabilities, applications, and data flows with sentiment tracking.',null],
+  [46,'Retail & Omnichannel','Peak trading scenarios (Black Friday, promotions, stock take) are considered in architecture planning.',0,'Architecture planning does not account for peak trading or seasonal events.','Peak scenarios are discussed informally but not documented as architecture constraints.','Peak trading scenarios are formally captured with affected systems, capacity constraints, and mitigation plans.',null],
+  [47,'Compliance & Regulatory','POPIA personal data flows are mapped (which systems process personal/health data, consent basis).',0,'No mapping of personal data flows from an architecture perspective.','Key personal data systems are known but a complete data flow map does not exist.','Full POPIA data flow map with data classification, processing purpose, and consent basis per system.',null],
+  [48,'Compliance & Regulatory','PCI-DSS payment architecture scope boundaries are documented.',0,'PCI-DSS scope is managed by the payment team; architecture has no visibility.','PCI scope is understood at high level but not mapped to the application/integration inventory.','PCI-DSS scope boundaries are documented with affected applications, integrations, and compensating controls.',null],
+  [49,'Compliance & Regulatory','Audit-ready artefacts (IT general controls, compliance evidence) can be produced from current architecture data.',0,'No architecture artefacts are used for audit; evidence is gathered manually each cycle.','Some architecture data supports audits but significant manual effort is needed to assemble evidence.','Architecture data produces audit-ready artefacts with quality seals, decision trails, and change logs.',null],
+  [50,'Compliance & Regulatory','Pharmaceutical recall and batch traceability is mapped to affected systems and data flows.',0,'Recall traceability is a manual process with no architecture mapping.','Key systems involved in recalls are known but end-to-end traceability is not documented.','Full traceability from SAHPRA notification to affected systems, stores, and customer touchpoints.',null],
+  [51,'Compliance & Regulatory','Data classification (public, sensitive, restricted, confidential) is applied to key data domains.',0,'No data classification framework exists.','Classification exists on paper but is not applied systematically to systems and data objects.','Data classification is applied across all key data domains and enforced in architecture governance.',null],
+  [52,'Jumpstart Readiness','An executive sponsor is named and committed to actively support the LeanIX rollout.',0,'No executive sponsor identified; the initiative is driven bottom-up by the EA team.','Sponsor is named but engagement is limited to approving budget.','Active sponsor who will participate in kickoff, resolve blockers, and enforce data ownership.',null],
+  [53,'Jumpstart Readiness','A core implementation team (3-5 people) is identified with capacity allocated.',0,'No team identified; resources will be figured out after kickoff.','Team is identified but members are at <50% capacity due to competing priorities.','Dedicated team with 80%+ allocation during Jumpstart and named roles (EA lead, data steward, tech contact).',null],
+  [54,'Jumpstart Readiness','SSO and security onboarding can be completed before Jumpstart day 1.',0,"SSO/security review hasn\'t started; typical lead time is unknown.",'Security review is initiated but may not complete before Jumpstart starts.','SSO is configured, security review is approved, workspace is provisioned and accessible.',null],
+  [55,'Jumpstart Readiness','Priority use cases for initial go-live are selected (max 2-3).',0,'No use cases prioritized; the customer wants everything at once.','Use cases are discussed but not formally prioritized or agreed.','2-3 priority use cases agreed with clear success criteria and stakeholder alignment.',null],
+  [56,'Jumpstart Readiness','A change management and communication plan exists for EA tool rollout.',0,'No change management planning; the assumption is the tool will be adopted organically.','Basic communication is planned (email announcement) but no structured adoption plan.','Full plan: stakeholder map, training schedule, communication cadence, EA awareness presentation.',null],
+  [57,'Jumpstart Readiness','The go-live timeline is agreed and aligned with external deadlines.',0,'No timeline discussed; go-live date is undefined.','Target date exists but is not aligned with business milestones or dependencies.','Go-live date agreed and aligned with audit cycles, SAP migration milestones, or board reviews.',null],
+  [58,'Jumpstart Readiness','Success criteria for the initial rollout are defined.',0,"No success criteria; \'success\' is undefined.","Informal success criteria exist (e.g., \'tool is live\') but not measurable.",'Measurable criteria defined: X apps imported, Y reports operational, Z stakeholders trained, data quality KPIs.',null],
+  [59,'Jumpstart Readiness','A rollout strategy is defined (core team → focus group → broader org).',0,'No rollout strategy; plan is to give everyone access on day 1.','Phased rollout is discussed but not formalized.','Defined rollout phases with user groups, training milestones, and feedback loops.',null],
+  [60,'Jumpstart Readiness','Core team members have blocked their calendars for implementation workshops (2-3 days/week for 6-8 weeks).',0,'No calendar blocking done; team availability is unknown.','Calendar blocking is partially done but competing priorities remain.','Full calendar blocking confirmed for all core team members during Jumpstart.',null],
+  [61,'Jumpstart Readiness','Application owners for at least 80% of business-critical applications are identified.',0,'No application owners identified; ownership is unknown.','Some application owners identified but coverage is below 80% of critical apps.','80%+ of business-critical applications have named, confirmed owners.',null],
+  [62,'Jumpstart Readiness','Application owners have been notified they will be asked to provide and validate information via surveys.',0,'No communication to application owners about upcoming data requests.','Some owners have been informally told but no structured communication sent.','All identified owners formally notified with timeline and expectations.',null],
+  [63,'Jumpstart Readiness','A responsibility model is drafted defining who creates, reviews, approves, and maintains architecture data.',0,'No governance or responsibility model exists for architecture data.','A draft responsibility model exists but is not reviewed or agreed.','Responsibility model is agreed, documented, and communicated to all stakeholders.',null],
+  [64,'Jumpstart Readiness','Existing architecture diagrams and documentation have been gathered and shared with the project team.',0,'No existing architecture documentation has been collected.','Some diagrams exist but are scattered and not consolidated.','All relevant architecture documentation gathered, organized, and shared.',null],
+  [65,'Jumpstart Readiness','A business capability map exists or an industry reference framework has been identified to start from.',0,'No capability model or reference framework identified.','A partial capability model exists or a reference framework is selected but not adapted.','A comprehensive capability model is in use or a reference framework is adapted and agreed.',null],
+  [66,'Jumpstart Readiness','Main types of business data are identified along with which systems hold that data.',0,'No visibility into key data domains or system ownership of data.','Some data domains identified but system-to-data mapping is incomplete.','All key data domains (customer, product, supplier, store, patient, prescription) identified with owning systems.',null],
+  [67,'Jumpstart Readiness','LeanIX web addresses are approved and accessible through the corporate network and firewall.',0,'No firewall or network approval process started.','Approval submitted but not yet confirmed or partially completed.','All LeanIX URLs approved, whitelisted, and confirmed accessible.',null],
+  [68,'Jumpstart Readiness','A collaboration channel (Teams/Slack) is created for the project team.',0,'No collaboration channel exists for the project.','A channel is planned but not yet created or not all members added.','Dedicated collaboration channel active with all team members and stakeholders.',null],
+  [69,'Jumpstart Readiness','A file sharing location is set up for project artefacts.',0,'No shared location for project files.','A location exists but structure and access are not finalized.','Shared location set up with folder structure, access rights, and initial documents uploaded.',null],
+  [70,'Jumpstart Readiness','Source systems that will feed data into LeanIX are confirmed and prioritized.',0,'No source systems identified for integration.','Some source systems are known but prioritization is not agreed.','All source systems confirmed, prioritized, and documented with integration timeline.',null],
+  [71,'Jumpstart Readiness','API access and credentials have been requested for each source system connecting to LeanIX.',0,'No API access requests submitted.','API access requested for some systems but not all; lead times are uncertain.','API access approved and credentials available for all priority source systems.',null],
+  [72,'Jumpstart Readiness','A technical contact is identified for each source system that will connect to LeanIX.',0,'No technical contacts identified for source systems.','Contacts known for some systems but gaps remain.','Named technical contact confirmed for every source system in integration scope.',null],
+  [73,'Jumpstart Readiness','Technical connection documentation has been reviewed for each source system.',0,'No connection documentation reviewed.','Documentation reviewed for some systems; gaps remain for others.','Connection documentation reviewed and validated for all priority source systems.',null],
+  [74,'Jumpstart Readiness','Sample data exports from key source systems are available for data mapping workshops.',0,'No sample data exports available.','Some exports exist but not for all planned source systems.','Sample exports from all key source systems are available, reviewed, and ready for mapping.',null],
+  [75,'Jumpstart Readiness','A stakeholder map of all people and teams who will consume LeanIX reports and dashboards is created.',0,'No stakeholder mapping done for report consumers.','Key stakeholders identified but a comprehensive map is incomplete.','Full stakeholder map created with roles, report needs, and communication plan.',null],
+  [76,'Jumpstart Readiness','A training plan is confirmed: who needs administrator training, data entry training, and read-only access.',0,'No training plan exists.','Training needs are discussed informally but not documented.','Training plan confirmed with role-based curriculum, schedule, and materials identified.',null],
+  [77,'Jumpstart Readiness','Content for an EA awareness presentation explaining the value of LeanIX to the broader organization is agreed.',0,'No awareness presentation planned.','Content outline exists but not finalized or reviewed.','Awareness presentation content agreed, reviewed by sponsor, and ready to deliver.',null],
+  [78,'Jumpstart Readiness','Documentation showing which systems handle personal and health data is available, or the DPO is engaged.',0,'No data privacy documentation or DPO engagement.','DPO is aware but documentation is incomplete.','Full documentation of personal/health data flows available or DPO actively engaged and supporting.',null],
+  [79,'Jumpstart Readiness','SAP system documentation is available: modules used, custom code inventory, and connections to other systems.',0,'No SAP documentation available; knowledge is tribal.','High-level module list exists but custom code and interfaces are undocumented.','Comprehensive SAP documentation available: modules, custom developments, interfaces, and dependencies.',null],
+];
+
+/* Prerequisites merged into Jumpstart Readiness scored assessment (Q52-Q87) */
+
+const generalQuestions = [
+  [1,'Which of these use cases are relevant? Application Portfolio Assessment, Application Rationalization, Application Modernization, Obsolescence Risk Management, ERP/SAP Transformation, Post-Merger Integration, Business Capability Mapping, Technology Risk & Compliance'],
+  [2,'What are the main challenges for your EA practice? (Missing resources, Lack of knowledge/skills, Lack of management buy-in, Operationalization of findings, Lack of tooling, Missing data, Lack of stakeholder commitment, Lack of collaboration, Other)'],
+  [3,'What is the size of your Application Portfolio? (≤100 / 101-299 / 300-499 / 500-999 / 1000+)'],
+  [4,'What core business system (ERP) do you use for finance, procurement, and operations? (SAP ECC, SAP S/4HANA, Oracle, Other)'],
+  [5,'What system do you use to connect your applications together (integration platform)? Note: SAP Integration Suite can be used to connect LeanIX to other tools in your landscape. Do you currently use SAP Integration Suite or plan to?'],
+  [6,'Do you have an IT asset management database that tracks your applications and infrastructure? If so, which tool? (Yes/No — if yes, which tool?)'],
+  [7,'Do you have a structured map of what your business does (business capability model)? (Yes and maintained / Yes but outdated / No / Using an industry reference model)'],
+  [8,'What is the target go-live timeline for the EA platform? (<3 months / 3-6 months / 6-12 months / >12 months)'],
+  [9,'What is the primary urgency driver? (SAP transformation, Compliance/audit, Cost optimization, M&A, Digital transformation, Other)'],
+  [10,'How many people will need access to LeanIX? (Core team only, fewer than 10 / Broader IT team, 10-50 / Enterprise-wide, more than 50)'],
+  [11,'Are there any known blockers or risks to the implementation timeline?'],
+  [12,'List any additional systems or data sources you would like to connect to LeanIX that are not covered in the questions above.'],
+  [13,'Are you aware of the LeanIX out-of-the-box integration catalogue? Have you reviewed which pre-built connectors are relevant to your landscape?'],
+];
+
+// Dimension order
+const dimensions = [
+  'Organizational Maturity','Use Case Maturity','Data Maturity','Technology Maturity',
+  'SAP & Clean Core Readiness','Integration Readiness','Retail & Omnichannel',
+  'Compliance & Regulatory','Jumpstart Readiness'
+];
+
+// State
+const scores = {};
+const comments = {};
+questions.forEach(q => { scores[q[0]] = q[3]; comments[q[0]] = q[7] || ''; });
+
+/* Prereq state removed — merged into scored assessment */
+
+const gqAnswers = {};
+generalQuestions.forEach(q => { gqAnswers[q[0]] = ''; });
+
+// ============ SIDEBAR ACCORDION ============
+function toggleSection(groupId) {
+  const group = document.getElementById(groupId);
+  const header = group.previousElementSibling;
+  group.classList.toggle('collapsed');
+  header.classList.toggle('collapsed');
+}
+
+// ============ TAB SWITCHING ============
+function showTab(idx) {
+  document.querySelectorAll('.content').forEach((el,i)=>{ el.classList.toggle('active', i===idx); });
+  document.querySelectorAll('.tab').forEach((el,i)=>{ el.classList.toggle('active', i===idx); });
+  if(idx===2) updateDashboard();
+
+}
+
+// ============ SCORED ASSESSMENT RENDER ============
+function getRatingInfo(score) {
+  if (!score) return {label:'-',cls:'',text:''};
+  if (score <= 2.0) return {label:'Critical',cls:'pill-critical',text:''};
+  if (score <= 3.0) return {label:'Low',cls:'pill-low',text:''};
+  if (score <= 3.9) return {label:'Moderate',cls:'pill-moderate',text:''};
+  return {label:'Strong',cls:'pill-strong',text:''};
+}
+
+function renderScoredAssessment() {
+  const tbody = document.getElementById('scored-body');
+  tbody.innerHTML = '';
+  let currentDim = null;
+  questions.forEach(q => {
+    const [id, dim, question, defaultScore, l1, l3, l5] = q;
+    if (dim !== currentDim) {
+      currentDim = dim;
+      const hRow = document.createElement('tr');
+      hRow.className = 'dim-header';
+      hRow.innerHTML = `<td colspan="5">${dim}</td>`;
+      tbody.appendChild(hRow);
+    }
+    const sc = scores[id];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="text-align:center;font-weight:600;color:#888;">${id}</td>
+      <td style="font-size:12px;color:#666;">${dim}</td>
+      <td>${question}</td>
+      <td class="score-cell" style="text-align:center;"
+          data-l1="${l1.replace(/"/g,'&quot;')}"
+          data-l3="${l3.replace(/"/g,'&quot;')}"
+          data-l5="${l5.replace(/"/g,'&quot;')}"
+          onmouseenter="showScoreTip(event,this)"
+          onmouseleave="hideScoreTip()"
+          onmousemove="moveScoreTip(event)">
+        <select id="sel-${id}" class="score-${sc}" onchange="updateScore(${id}, this.value)">
+          <option value="0" ${sc==0?'selected':''}>–</option>${[1,2,3,4,5].map(v=>`<option value="${v}" ${v==sc?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </td>
+      <td><textarea class="comment-input" placeholder="Add context..." onchange="updateComment(${id},this.value)">${comments[id]||''}</textarea></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============ SCORE CELL TOOLTIP ============
+function showScoreTip(e, cell) {
+  const l1 = cell.dataset.l1;
+  const l3 = cell.dataset.l3;
+  const l5 = cell.dataset.l5;
+  const tip = document.getElementById('score-tip');
+  tip.innerHTML = `
+    <div class="st-title">Score Level Guide</div>
+    <div class="st-row">
+      <div class="st-lbl" style="color:#ff8585;">● Level 1 — No activity</div>
+      <div>${l1}</div>
+    </div>
+    <div class="st-row">
+      <div class="st-lbl" style="color:#ffb347;">● Level 3 — In progress</div>
+      <div>${l3}</div>
+    </div>
+    <div class="st-row">
+      <div class="st-lbl" style="color:#6fcf97;">● Level 5 — Embedded</div>
+      <div>${l5}</div>
+    </div>
+  `;
+  tip.style.display = 'block';
+  moveScoreTip(e);
+}
+function moveScoreTip(e) {
+  const tip = document.getElementById('score-tip');
+  const tx = e.clientX + 18;
+  const ty = e.clientY - 12;
+  const w = tip.offsetWidth;
+  const h = tip.offsetHeight;
+  tip.style.left = (tx + w > window.innerWidth  ? e.clientX - w - 8 : tx) + 'px';
+  tip.style.top  = (ty + h > window.innerHeight ? e.clientY - h - 8 : ty) + 'px';
+}
+function hideScoreTip() {
+  document.getElementById('score-tip').style.display = 'none';
+}
+
+function updateScore(id, val) {
+  scores[id] = parseInt(val);
+  const sel = document.getElementById('sel-'+id);
+  if (sel) {
+    [0,1,2,3,4,5].forEach(v => sel.classList.remove('score-'+v));
+    sel.classList.add('score-'+val);
+  }
+  updateDashboard();
+}
+
+function updateComment(id, val) { comments[id] = val; }
+
+// ============ DIMENSION CALCULATIONS ============
+function calcDimScores() {
+  const dimScores = {};
+  dimensions.forEach(d => {
+    const qs = questions.filter(q=>q[1]===d);
+    const vals = qs.map(q=>scores[q[0]]).filter(v=>v!=null && v>0);
+    dimScores[d] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+  });
+  return dimScores;
+}
+
+// ============ DASHBOARD UPDATE ============
+let radarChartObj = null;
+
+function updateDashboard() {
+  const dimScores = calcDimScores();
+  const allScores = Object.values(dimScores).filter(v=>v>0);
+  const globalScore = allScores.length ? allScores.reduce((a,b)=>a+b,0)/allScores.length : 0;
+  const globalPct = globalScore/5*100;
+  const scoredCount = questions.filter(q=>scores[q[0]]!=null&&scores[q[0]]>0).length;
+
+  document.getElementById('global-score').textContent = globalScore.toFixed(2);
+  document.getElementById('global-pct').textContent = globalPct.toFixed(1)+'%';
+
+  const ri = getRatingInfo(globalScore);
+  document.getElementById('global-rating').innerHTML = `<span class="pill ${ri.cls}">${ri.label}</span>`;
+  const descs = {Critical:'Significant gaps. Adjust scope and timeline.',Low:'Foundational gaps. Plan extra workshops.',Moderate:'Solid foundation. Standard Jumpstart scope.',Strong:'High readiness. Accelerated rollout possible.','-':''};
+  document.getElementById('global-rating-desc').textContent = descs[ri.label]||'';
+  document.getElementById('scored-count').textContent = scoredCount;
+
+  // Dim table
+  const tbody = document.getElementById('dim-table-body');
+  tbody.innerHTML = '';
+  dimensions.forEach(d => {
+    const avg = dimScores[d];
+    const pct = avg/5*100;
+    const ri2 = getRatingInfo(avg);
+    const bar = `<div class="progress-bar" style="margin-top:4px;"><div class="progress-fill" style="width:${pct}%;background:${avg<=2?'#bb0000':avg<=3?'#e9730c':avg<=3.9?'#f0ab00':'#107e3e'};"></div></div>`;
+    tbody.innerHTML += `<tr>
+      <td><strong>${d}</strong></td>
+      <td><span class="score-badge score-${Math.round(avg)||1}" style="width:auto;padding:2px 8px;border-radius:4px;">${avg.toFixed(2)}</span></td>
+      <td>${pct.toFixed(1)}%${bar}</td>
+      <td><span class="pill ${ri2.cls}">${ri2.label}</span></td>
+    </tr>`;
+  });
+
+  // Radar chart
+  const labels = dimensions.map(d=>d.replace(' Maturity','').replace(' Readiness','').replace(' & ','/'));
+  const data = dimensions.map(d=>dimScores[d]);
+
+  if (radarChartObj) { radarChartObj.destroy(); radarChartObj = null; }
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  radarChartObj = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Maturity Score',
+        data: data,
+        backgroundColor: 'rgba(0,112,242,0.15)',
+        borderColor: 'rgba(0,112,242,0.8)',
+        borderWidth: 2,
+        pointBackgroundColor: '#0070f2',
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      scales: { r: { min:0, max:5, ticks:{ stepSize:1, font:{size:10} }, pointLabels:{ font:{size:11} } } },
+      plugins: { legend: { display: false } },
+      responsive: true, maintainAspectRatio: false,
+    }
+  });
+}
+
+/* Prerequisites rendering removed — merged into scored assessment */
+
+// ============ GENERAL QUESTIONS RENDER ============
+function renderGeneralQuestions() {
+  const tbody = document.getElementById('gq-body');
+  tbody.innerHTML = '';
+  generalQuestions.forEach(q => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="text-align:center;font-weight:600;color:#888;">${q[0]}</td>
+      <td>${q[1]}</td>
+      <td><textarea class="textarea-answer" placeholder="Enter your answer..." onchange="gqAnswers[${q[0]}]=this.value">${gqAnswers[q[0]]||''}</textarea></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============ EFFORT ESTIMATION ============
+const effortActivities = [
+  {phase:'Pre-Jumpstart (Weeks -4 to -1)',activity:'Workspace provisioning & SSO setup',sapBase:1.5,custBase:4.5,dims:['Technology Maturity','Jumpstart Readiness']},
+  {phase:'Pre-Jumpstart (Weeks -4 to -1)',activity:'Data preparation & inventory cleanup',sapBase:2,custBase:8,dims:['Data Maturity']},
+  {phase:'Pre-Jumpstart (Weeks -4 to -1)',activity:'Stakeholder alignment & sponsor engagement',sapBase:0.5,custBase:2,dims:['Organizational Maturity']},
+  {phase:'Pre-Jumpstart (Weeks -4 to -1)',activity:'Integration planning & API access',sapBase:1,custBase:4,dims:['Integration Readiness']},
+  {phase:'Pre-Jumpstart (Weeks -4 to -1)',activity:'Use case prioritization workshop',sapBase:2,custBase:2,dims:['Use Case Maturity']},
+  {phase:'Foundation Setup (Weeks 1-2)',activity:'Workspace configuration & meta-model setup',sapBase:4.5,custBase:3,dims:['Technology Maturity']},
+  {phase:'Foundation Setup (Weeks 1-2)',activity:'Initial data import (applications)',sapBase:2,custBase:5,dims:['Data Maturity']},
+  {phase:'Foundation Setup (Weeks 1-2)',activity:'Business capability mapping',sapBase:2,custBase:4,dims:['Use Case Maturity']},
+  {phase:'Foundation Setup (Weeks 1-2)',activity:'Governance framework definition',sapBase:0.5,custBase:2,dims:['Organizational Maturity']},
+  {phase:'Foundation Setup (Weeks 1-2)',activity:'SAP landscape documentation',sapBase:1,custBase:4,dims:['SAP & Clean Core Readiness']},
+  {phase:'Data Enrichment & Integrations (Weeks 3-5)',activity:'CMDB / ServiceNow integration setup',sapBase:3,custBase:4,dims:['Integration Readiness']},
+  {phase:'Data Enrichment & Integrations (Weeks 3-5)',activity:'Application data enrichment & surveys',sapBase:2,custBase:10,dims:['Data Maturity']},
+  {phase:'Data Enrichment & Integrations (Weeks 3-5)',activity:'Retail & pharmacy landscape mapping',sapBase:0.5,custBase:4,dims:['Retail & Omnichannel']},
+  {phase:'Data Enrichment & Integrations (Weeks 3-5)',activity:'Compliance & data classification setup',sapBase:1,custBase:5,dims:['Compliance & Regulatory']},
+  {phase:'Data Enrichment & Integrations (Weeks 3-5)',activity:'SAP Clean Core analysis integration',sapBase:2,custBase:3,dims:['SAP & Clean Core Readiness']},
+  {phase:'Data Enrichment & Integrations (Weeks 3-5)',activity:'Automation & quality rules setup',sapBase:4.5,custBase:3,dims:['Technology Maturity']},
+  {phase:'Use Case Delivery (Weeks 5-7)',activity:'Report & dashboard configuration',sapBase:3,custBase:3,dims:['Use Case Maturity']},
+  {phase:'Use Case Delivery (Weeks 5-7)',activity:'Application rationalization setup',sapBase:2,custBase:4,dims:['Use Case Maturity']},
+  {phase:'Use Case Delivery (Weeks 5-7)',activity:'Obsolescence risk management',sapBase:3,custBase:4.5,dims:['Technology Maturity']},
+  {phase:'Use Case Delivery (Weeks 5-7)',activity:'Training delivery (admin + end users)',sapBase:3,custBase:6,dims:['Jumpstart Readiness']},
+  {phase:'Use Case Delivery (Weeks 5-7)',activity:'Change management & awareness',sapBase:1,custBase:5,dims:['Jumpstart Readiness']},
+  {phase:'Go-Live & Handover (Week 8)',activity:'Go-live support & issue resolution',sapBase:2,custBase:2,dims:['Jumpstart Readiness']},
+  {phase:'Go-Live & Handover (Week 8)',activity:'Support model activation',sapBase:1,custBase:2,dims:['Jumpstart Readiness']},
+  {phase:'Go-Live & Handover (Week 8)',activity:'Documentation & knowledge transfer',sapBase:2,custBase:3,dims:['Jumpstart Readiness']},
+  {phase:'Go-Live & Handover (Week 8)',activity:'Post-go-live roadmap planning',sapBase:0.5,custBase:1.5,dims:['Organizational Maturity']},
+];
+
+function getMultiplier(dimScore) {
+  if (dimScore >= 4.5) return 0.5;
+  if (dimScore >= 3.5) return 0.75;
+  if (dimScore >= 2.5) return 1.0;
+  if (dimScore >= 1.5) return 1.5;
+  return 2.0;
+}
+
+let effortChartObj = null;
+
+function updateEffortEstimation() {
+  const dimScores = calcDimScores();
+
+  // Calculate per-activity effort
+  const rows = effortActivities.map(a => {
+    const dimAvg = a.dims.reduce((s,d)=>s+(dimScores[d]||3),0)/a.dims.length;
+    const mult = getMultiplier(dimAvg);
+    return {...a, dimAvg, mult, sap: +(a.sapBase*mult).toFixed(1), cust: +(a.custBase*mult).toFixed(1)};
+  });
+
+  // Phase totals
+  const phases = {};
+  rows.forEach(r => {
+    if (!phases[r.phase]) phases[r.phase] = {sap:0,cust:0};
+    phases[r.phase].sap += r.sap;
+    phases[r.phase].cust += r.cust;
+  });
+
+  const totalSap = rows.reduce((s,r)=>s+r.sap,0);
+  const totalCust = rows.reduce((s,r)=>s+r.cust,0);
+
+  // KPIs
+  document.getElementById('sap-effort').textContent = Math.round(totalSap);
+  document.getElementById('cust-effort').textContent = Math.round(totalCust);
+  document.getElementById('total-effort').textContent = Math.round(totalSap+totalCust);
+
+  const allScores = Object.values(dimScores).filter(v=>v>0);
+  const globalScore = allScores.length ? allScores.reduce((a,b)=>a+b,0)/allScores.length : 0;
+  document.getElementById('effort-timeline').textContent = globalScore <= 2 ? '10-12 weeks' : globalScore <= 3 ? '8-10 weeks' : '6-8 weeks';
+
+  // Phase table
+  const pBody = document.getElementById('effort-phase-body');
+  pBody.innerHTML = '';
+  Object.entries(phases).forEach(([phase,v]) => {
+    pBody.innerHTML += `<tr>
+      <td><strong>${phase}</strong></td>
+      <td style="text-align:center;">${v.sap.toFixed(1)}</td>
+      <td style="text-align:center;">${v.cust.toFixed(1)}</td>
+      <td style="text-align:center;font-weight:700;">${(v.sap+v.cust).toFixed(1)}</td>
+    </tr>`;
+  });
+  pBody.innerHTML += `<tr style="background:#f0f7ff;font-weight:700;">
+    <td>TOTAL</td>
+    <td style="text-align:center;">${totalSap.toFixed(1)}</td>
+    <td style="text-align:center;">${totalCust.toFixed(1)}</td>
+    <td style="text-align:center;">${(totalSap+totalCust).toFixed(1)}</td>
+  </tr>`;
+
+  // Detail table
+  const dBody = document.getElementById('effort-detail-body');
+  dBody.innerHTML = '';
+  let curPhase = '';
+  rows.forEach(r => {
+    if (r.phase !== curPhase) {
+      curPhase = r.phase;
+      dBody.innerHTML += `<tr class="dim-header"><td colspan="4">${r.phase}</td></tr>`;
+    }
+    const ri = getRatingInfo(r.dimAvg);
+    dBody.innerHTML += `<tr>
+      <td>${r.activity}</td>
+      <td style="text-align:center;">${r.sap}</td>
+      <td style="text-align:center;">${r.cust}</td>
+      <td style="text-align:center;"><span class="pill ${ri.cls}">${r.dimAvg.toFixed(1)}</span> <span style="font-size:11px;color:#888;">×${r.mult}</span></td>
+    </tr>`;
+  });
+
+  // Risk areas
+  const risks = document.getElementById('effort-risks');
+  const riskDims = dimensions.filter(d => dimScores[d] < 2.5 && dimScores[d] > 0);
+  const lowQs = questions.filter(q => scores[q[0]] <= 2);
+  risks.innerHTML = '';
+  if (riskDims.length) {
+    risks.innerHTML += `<h3 style="color:var(--red);margin-bottom:8px;">Dimensions Below 2.5 (extra pre-work needed)</h3>`;
+    riskDims.forEach(d => {
+      risks.innerHTML += `<p style="margin-bottom:6px;">⚠ <strong>${d}</strong>: ${dimScores[d].toFixed(2)} — effort multiplier ×${getMultiplier(dimScores[d])}</p>`;
+    });
+  }
+  if (lowQs.length) {
+    risks.innerHTML += `<h3 style="color:var(--orange);margin:16px 0 8px;">Questions Scoring ≤ 2 (${lowQs.length} items — immediate attention)</h3>`;
+    lowQs.forEach(q => {
+      risks.innerHTML += `<p style="margin-bottom:4px;font-size:13px;">• Q${q[0]} [${q[1]}]: score ${scores[q[0]]} — ${q[2].substring(0,80)}${q[2].length>80?'…':''}</p>`;
+    });
+  }
+  if (!riskDims.length && !lowQs.length) {
+    risks.innerHTML = '<p style="color:var(--green);font-weight:600;">No critical risk areas identified.</p>';
+  }
+
+  // Effort pie chart
+  if (effortChartObj) { effortChartObj.destroy(); effortChartObj = null; }
+  const phaseLabels = Object.keys(phases);
+  const sapData = phaseLabels.map(p => +phases[p].sap.toFixed(1));
+  const custData = phaseLabels.map(p => +phases[p].cust.toFixed(1));
+  const shortLabels = phaseLabels.map(p=>p.replace(/ \(.*?\)/,''));
+
+  const ectx = document.getElementById('effortChart').getContext('2d');
+  effortChartObj = new Chart(ectx, {
+    type: 'bar',
+    data: {
+      labels: shortLabels,
+      datasets: [
+        {label:'SAP', data:sapData, backgroundColor:'#0070f2'},
+        {label:'Customer', data:custData, backgroundColor:'#2db34a'},
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x:{stacked:true}, y:{stacked:true, title:{display:true,text:'Person-days'}} },
+      plugins: { legend:{position:'top'} },
+    }
+  });
+}
+
+// ============ INIT ============
+renderScoredAssessment();
+renderGeneralQuestions();
+updateDashboard();
+</script>
+  </div><!-- /.main-content -->
+</div><!-- /.app-body -->
+
+<div id="score-tip"></div>
+</div><!-- /.app-wrapper -->
+
+<script>
+// ============ AUTH ============
+const VALID_USERS = {
+  'dischem':  '28e60c1e07da34e7ebee32b2959e554d60b0ab80',
+  'sap':      '28e60c1e07da34e7ebee32b2959e554d60b0ab80',
+  'admin':    '28e60c1e07da34e7ebee32b2959e554d60b0ab80'
+};
+
+async function sha1(str) {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const user = document.getElementById('loginUser').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+
+  if (!user || !pass) { errEl.textContent = 'Please enter username and password.'; return false; }
+
+  const hash1 = await sha1(pass);
+  const hash256 = await sha256(pass);
+  const expected = VALID_USERS[user];
+
+  if (expected && (expected === hash1 || expected === hash256)) {
+    sessionStorage.setItem('assessmentAuth', 'true');
+    showApp();
+  } else {
+    errEl.textContent = 'Invalid username or password.';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginPass').focus();
+  }
+  return false;
+}
+
+function showApp() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('appWrapper').classList.add('visible');
+}
+
+function handleLogout() {
+  sessionStorage.removeItem('assessmentAuth');
+  document.getElementById('appWrapper').classList.remove('visible');
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').textContent = '';
+}
+
+// Auto-login if already authenticated in this session
+if (sessionStorage.getItem('assessmentAuth') === 'true') {
+  showApp();
+}
+</script>
+</body>
+
+</html>
